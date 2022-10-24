@@ -1,12 +1,18 @@
 package gps
 
 import (
+	"bufio"
 	"errors"
-	"fmt"
-	"strings"
+	"log"
 
 	"github.com/tarm/serial"
 )
+
+type serialPort interface {
+	Write(p []byte) (n int, err error)
+	Read(p []byte) (n int, err error)
+	Close() error
+}
 
 type GPS struct {
 	latitude   float64
@@ -20,7 +26,7 @@ type GPS struct {
 	hdop       string
 	vdop       string
 
-	serialPort  *serial.Port
+	serialPort  serialPort
 	data        chan string
 	isConnected bool
 
@@ -42,43 +48,19 @@ type Position struct {
 	Vdop       string   `json:"vdop"`
 }
 
-func (gps *GPS) reading() {
-	go func() {
-		line := []byte{}
-		for {
-			buffer := make([]byte, 64)
-			n, err := gps.serialPort.Read(buffer)
-			if err != nil {
-				if gps.Debug {
-					fmt.Println("GPS.SerialPort.Read.ERROR: ", err)
-				}
+// Reading reads from gps
+func (gps *GPS) Reading() {
+	scanner := bufio.NewScanner(gps.serialPort)
+	for scanner.Scan() {
+		gps.parseNmeaSetence(scanner.Text())
+	}
 
-				gps.Disconnect()
-
-				break
-			}
-
-			chuck := buffer[:n]
-			size := len(chuck)
-			for j := 0; j < size; j++ {
-				line = append(line, chuck[j])
-
-				if chuck[j] == bNL {
-					s := string(line)
-					parts := strings.Split(s, sCRNL)
-					if len(parts) > 0 {
-						first := parts[0]
-						gps.data <- first
-
-						line = []byte{}
-					}
-				}
-			}
+	if err := scanner.Err(); err != nil {
+		if gps.Debug {
+			log.Println("GPS.SerialPort.Reading.ERROR: ", err)
 		}
-	}()
 
-	for sentence := range gps.data {
-		gps.parseNmeaSetence(sentence)
+		gps.Disconnect()
 	}
 }
 
@@ -92,14 +74,14 @@ func (gps *GPS) isClosed(ch chan string) bool {
 	return false
 }
 
-// Connect ... open serial connection with gps
+// Connect open serial connection with gps
 func (gps *GPS) Connect() error {
 	config := &serial.Config{Name: gps.Port, Baud: gps.BaudRate}
 	var err error
 	gps.serialPort, err = serial.OpenPort(config)
 	if err != nil {
 		if gps.Debug {
-			fmt.Println("GPS.SerialPort.OpenPort.ERROR: ", err)
+			log.Println("GPS.SerialPort.OpenPort.ERROR: ", err)
 		}
 
 		return err
@@ -107,8 +89,6 @@ func (gps *GPS) Connect() error {
 
 	gps.data = make(chan string)
 	gps.isConnected = true
-
-	go gps.reading()
 
 	return err
 }
@@ -131,7 +111,7 @@ func (gps *GPS) Disconnect() error {
 		err = gps.serialPort.Close()
 		if err != nil {
 			if gps.Debug {
-				fmt.Println("GPS.SerialPort.Close.ERROR: ", err)
+				log.Println("GPS.SerialPort.Close.ERROR: ", err)
 			}
 
 			return err
@@ -141,12 +121,12 @@ func (gps *GPS) Disconnect() error {
 	return err
 }
 
-// IsConnected ...  state of the connection with gps
+// IsConnected return state of the connection with gps
 func (gps *GPS) IsConnected() bool {
 	return gps.isConnected
 }
 
-// FetchPosition ... Current gps position
+// FetchPosition return current gps position
 func (gps *GPS) FetchPosition() (Position, error) {
 	var err error
 

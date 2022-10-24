@@ -1,6 +1,8 @@
 package gps
 
-import "strings"
+import (
+	"strings"
+)
 
 func (gps *GPS) parseNmeaSetence(sentence string) {
 	cksum := strings.Split(sentence, "*")

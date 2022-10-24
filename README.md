@@ -15,7 +15,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/JamsMendez/gps"
+	"github.com/jamsMendez/gps"
 )
 
 func main() {
@@ -28,6 +28,8 @@ func main() {
 	if err != nil {
 		log.Fatal("GPS Connect ERROR: ", err)
 	}
+
+	go mGPs.Reading()
 
 	defer mGps.Disconnect()
 
