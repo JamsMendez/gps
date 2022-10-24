@@ -1,4 +1,4 @@
-module github.com/jamsMendez/gps
+module github.com/jamsmendez/gps
 
 go 1.16
 

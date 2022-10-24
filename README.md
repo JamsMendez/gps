@@ -15,7 +15,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/jamsMendez/gps"
+	"github.com/jamsmendez/gps"
 )
 
 func main() {
